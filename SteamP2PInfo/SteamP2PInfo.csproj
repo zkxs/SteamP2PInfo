@@ -273,10 +273,6 @@
     <Compile Include="FormatUtils.cs" />
     <Compile Include="HotkeyConverter.cs" />
     <Compile Include="HotkeyManager.cs" />
-    <Compile Include="OverlayTextBlock.cs" />
-    <Compile Include="OverlayWindow.xaml.cs">
-      <DependentUpon>OverlayWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="SteamPeerInfo.cs" />
     <Compile Include="SteamPeerNewAPI.cs" />
     <Compile Include="SteamPeerOldAPI.cs" />
@@ -310,10 +306,6 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="OverlayWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="WindowSelectDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

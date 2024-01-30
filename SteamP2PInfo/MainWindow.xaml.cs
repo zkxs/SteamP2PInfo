@@ -1,26 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 using MahApps.Metro.Controls;
 using MahApps.Metro.Controls.Dialogs;
 using System.IO;
 using Steamworks;
-using System.Security.Permissions;
 using System.Media;
 using SteamP2PInfo.Config;
 
@@ -32,7 +25,6 @@ namespace SteamP2PInfo
     public partial class MainWindow
     {
         private ObservableCollection<SteamPeerBase> peers;
-        private OverlayWindow overlay;
         private Timer timer;
         private int timerTicks = 0;
         private int overlayHotkey = 0;
@@ -127,18 +119,6 @@ namespace SteamP2PInfo
                         col.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
                     }
                     dataGridSession.UpdateLayout();
-
-                    // Update overlay column sizes
-                    foreach (var col in overlay.dataGrid.Columns)
-                    {
-                        col.Width = new DataGridLength(1, DataGridLengthUnitType.Pixel);
-                        col.Width = new DataGridLength(1, DataGridLengthUnitType.SizeToCells);
-                    }
-                    overlay.dataGrid.UpdateLayout();
-
-                    // Queue position update after the overlay has re-rendered
-                    Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(overlay.UpdatePosition));
-                    overlay.UpdateVisibility();
                 }
                 catch (Exception e)
                 {
@@ -168,7 +148,6 @@ namespace SteamP2PInfo
         {
             if (GameConfig.Current != null) GameConfig.Current.Save();
             Settings.Default.Save();
-            if (overlay != null) overlay.Close();
             HotkeyManager.Disable();
             ETWPingMonitor.Stop();
         }
@@ -225,19 +204,6 @@ namespace SteamP2PInfo
 
                     if(MustEnterSteamCommand())
                         SteamConsoleHelper();
-
-                    HotkeyManager.RemoveHotkey(overlayHotkey);
-                    overlayHotkey = HotkeyManager.AddHotkey(wInfo.Handle, () => GameConfig.Current.OverlayConfig.Hotkey, () => GameConfig.Current.OverlayConfig.Enabled ^= true);
-
-                    overlay = new OverlayWindow(wInfo.Handle, wInfo.ProcessId, wInfo.ThreadId);
-                    overlay.dataGrid.DataContext = peers;
-                    if (!overlay.InstallMsgHook())
-                    {
-                        overlay.Close();
-                        MessageBox.Show("Failed to setup overlay message hook", "WINAPI Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                        Close();
-                        return;
-                    }
 
                     textGameState.Text = wInfo.Title;
                     textGameState.Foreground = Brushes.LawnGreen;
