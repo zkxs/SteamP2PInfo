@@ -187,8 +187,6 @@ namespace SteamP2PInfo
                 processed += 1;
             }
 
-            Logger.WriteLine($"[PARSE INFO] read {processed} log lines");
-
             // clean up old peers. We can't remove from a Dictionary while iterating, so we save the entries we need to delete and then do a second pass.
             foreach (var peerMapping in mPeers)
             {

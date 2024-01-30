@@ -211,8 +211,6 @@ namespace SteamP2PInfo
                     Grid configEditor = ConfigUIBuilder.CreateConfigEditor(GameConfig.Current);
                     ConfigTab.Children.Add(configEditor);
 
-                    Logger.WriteLine("Started the thing...");
-
                     ETWPingMonitor.Start();
                     timer.Change(0, 1000); // should be a 1s interval
                 }
