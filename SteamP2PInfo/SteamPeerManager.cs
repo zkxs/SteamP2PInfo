@@ -20,7 +20,7 @@ namespace SteamP2PInfo
         private static FileSystemWatcher fsWatcher;
         private static bool mustReopenLog = true;
         private static readonly Regex steamid3 = new Regex(@"\[U:1:(?<id>\d+)\]", RegexOptions.Compiled);
-        private static readonly long peerTimeoutMs = 10000; // 10 seconds
+        private static readonly long peerTimeoutMs = 1000 * 60 * 12; // 3v3 is 3 rounds of 3 minutes each, so 12 minutes should be sufficient
         private const long steamid64ident = 76561197960265728;
 
         /// <summary>
@@ -117,8 +117,22 @@ namespace SteamP2PInfo
                     continue;
                 }
 
-                if (!line.Contains("SendP2PPacket") || !line.Contains(GameConfig.Current.ProcessName))
+                if (!line.Contains(GameConfig.Current.ProcessName))
                     continue;
+
+                bool begin;
+                if (line.Contains("BeginAuthSession"))
+                {
+                    begin = true;
+                }
+                else if (line.Contains("EndAuthSession"))
+                {
+                    begin = false;
+                }
+                else
+                {
+                    continue; // no idea wtf this line was, but it doesn't belong
+                }
 
                 CSteamID steamID = ExtractUser(line);
 
@@ -126,16 +140,29 @@ namespace SteamP2PInfo
                 {
                     if (steamID.BIndividualAccount())
                     {
-                        if (mPeers.TryGetValue(steamID, out SteamPeerInfo peer))
+                        if (begin)
                         {
-                            peer.OnPacketSent();
+                            if (mPeers.TryGetValue(steamID, out SteamPeerInfo peer))
+                            {
+                                peer.OnSessionStart();
+                            }
+                            else
+                            {
+                                SteamPeerBase newPeer = GetPeer(steamID);
+                                if (newPeer != null)
+                                {
+                                    mPeers.Add(steamID, new SteamPeerInfo(newPeer));
+                                }
+                            }
                         }
                         else
                         {
-                            SteamPeerBase newPeer = GetPeer(steamID);
-                            if (newPeer != null)
+                            // peer just disconnected
+                            if (mPeers.TryGetValue(steamID, out SteamPeerInfo peer))
                             {
-                                mPeers.Add(steamID, new SteamPeerInfo(newPeer));
+                                mPeers.Remove(steamID);
+                                peer.disconnectReason = SteamPeerInfo.DisconnectReason.AUTH_SESSION_ENDED;
+                                inactivePeers.Add(new KeyValuePair<CSteamID, SteamPeerInfo>(steamID, peer));
                             }
                         }
                     }
@@ -151,25 +178,33 @@ namespace SteamP2PInfo
             // clean up old peers. We can't remove from a Dictionary while iterating, so we save the entries we need to delete and then do a second pass.
             foreach (var peerMapping in mPeers)
             {
-                if (peerMapping.Value.LastSentPacketElapsedMilliseconds() > peerTimeoutMs)
+                if (peerMapping.Value.LastPeerActivityMilliseconds() > peerTimeoutMs)
                 {
+                    peerMapping.Value.disconnectReason = SteamPeerInfo.DisconnectReason.TIMED_OUT; ;
                     inactivePeers.Add(peerMapping);
                 }
                 else if (!peerMapping.Value.steamPeerBase.UpdatePeerInfo())
                 {
-                    peerMapping.Value.disconnect = true;
+                    peerMapping.Value.disconnectReason = SteamPeerInfo.DisconnectReason.PEER_DISCONNECTED;
                     inactivePeers.Add(peerMapping);
                 }
             }
             foreach (var peer in inactivePeers)
             {
-                if (peer.Value.disconnect)
+                switch (peer.Value.disconnectReason)
                 {
-                    Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) has disconnected");
-                }
-                else
-                { 
-                    Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) has timed out");
+                    case SteamPeerInfo.DisconnectReason.AUTH_SESSION_ENDED:
+                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) auth session ended");
+                        break;
+                    case SteamPeerInfo.DisconnectReason.PEER_DISCONNECTED:
+                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) peer disconnected");
+                        break;
+                    case SteamPeerInfo.DisconnectReason.TIMED_OUT:
+                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) timed out");
+                        break;
+                    default:
+                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) unknown reason");
+                        break;
                 }
                 peer.Value.steamPeerBase.Dispose();
                 mPeers.Remove(peer.Key);

@@ -5,24 +5,32 @@ namespace SteamP2PInfo
     internal class SteamPeerInfo
     {
         internal SteamPeerBase steamPeerBase;
-        internal Stopwatch timeSinceLastPacketSent;
-        internal bool disconnect;
+        internal Stopwatch timeSinceLastSessionStarted;
+        internal DisconnectReason disconnectReason;
 
         internal SteamPeerInfo(SteamPeerBase steamPeerBase)
         {
             this.steamPeerBase = steamPeerBase;
-            timeSinceLastPacketSent = Stopwatch.StartNew();
-            disconnect = false;
+            timeSinceLastSessionStarted = Stopwatch.StartNew();
+            disconnectReason = DisconnectReason.NONE;
         }
 
-        internal void OnPacketSent()
+        internal void OnSessionStart()
         {
-            timeSinceLastPacketSent.Restart();
+            timeSinceLastSessionStarted.Restart();
         }
 
-        internal long LastSentPacketElapsedMilliseconds()
+        internal long LastPeerActivityMilliseconds()
         {
-            return timeSinceLastPacketSent.ElapsedMilliseconds;
+            return timeSinceLastSessionStarted.ElapsedMilliseconds;
+        }
+
+        internal enum DisconnectReason
+        {
+            NONE,
+            AUTH_SESSION_ENDED,
+            PEER_DISCONNECTED,
+            TIMED_OUT,
         }
     }
 }
