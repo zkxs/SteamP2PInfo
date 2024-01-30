@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO;
 using Steamworks;
-using System.Diagnostics;
 
 using SteamP2PInfo.Config;
 using System.Text.RegularExpressions;
@@ -23,16 +19,16 @@ namespace SteamP2PInfo
         private static StreamReader sr;
         private static FileSystemWatcher fsWatcher;
         private static bool mustReopenLog = true;
-
-        /// <summary>
-        /// List of Steam lobbies the local player is currently in.
-        /// </summary>
-        private static HashSet<CSteamID> mLobbies = new HashSet<CSteamID>();
+        private static readonly Regex steamid3 = new Regex(@"\[U:1:(?<id>\d+)\]", RegexOptions.Compiled);
+        private static readonly long peerTimeoutMs = 10000; // 10 seconds
+        private const long steamid64ident = 76561197960265728;
 
         /// <summary>
         /// List of peers mapped by Steam ID.
         /// </summary>
-        private static Dictionary<CSteamID, SteamPeerBase> mPeers = new Dictionary<CSteamID, SteamPeerBase>();
+        private static Dictionary<CSteamID, SteamPeerInfo> mPeers = new Dictionary<CSteamID, SteamPeerInfo>();
+
+        private static List<KeyValuePair<CSteamID, SteamPeerInfo>> inactivePeers = new List<KeyValuePair<CSteamID, SteamPeerInfo>>();
 
         public static void Init()
         {
@@ -43,16 +39,45 @@ namespace SteamP2PInfo
             fsWatcher.EnableRaisingEvents = true;
         }
 
-        private static CSteamID ExtractLobby(string str)
+        private static CSteamID ExtractUser(string str)
         {
-            Regex steamid3 = new Regex(@"\[L:1:(?<id>\d+)\]");
-
             Match m = steamid3.Match(str);
             if (m.Success)
             {
-                return new CSteamID(0x186000000000000ul | ulong.Parse(m.Groups["id"].Value));
+                return new CSteamID(ulong.Parse(m.Groups["id"].Value) + steamid64ident);
             }
-            else return new CSteamID(0);
+            else
+            {
+                return new CSteamID(0);
+            }
+        }
+
+        private static SteamPeerBase GetPeer(CSteamID player)
+        {
+            if (SteamNetworking.GetP2PSessionState(player, out P2PSessionState_t pConnectionState) && SteamPeerOldAPI.IsSessionStateOK(pConnectionState))
+            {
+                SteamPeerOldAPI peer = new SteamPeerOldAPI(player);
+                Logger.WriteLine($"[PEER CONNECT] \"{peer.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.SteamID}) has connected via SteamNetworking");
+                if (GameConfig.Current.SetPlayedWith)
+                    SteamFriends.SetPlayedWith(player);
+                return peer;
+            }
+            else
+            {
+                SteamNetworkingIdentity netIdentity = new SteamNetworkingIdentity();
+                netIdentity.SetSteamID(player);
+                var connState = SteamNetworkingMessages.GetSessionConnectionInfo(ref netIdentity, out _, out _);
+                if (SteamPeerNewAPI.IsConnStateOK(connState))
+                {
+                    SteamPeerNewAPI peer = new SteamPeerNewAPI(player);
+                    Logger.WriteLine($"[PEER CONNECT] \"{peer.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.SteamID}) has connected via SteamNetworkingMessages");
+                    if (GameConfig.Current.SetPlayedWith)
+                        SteamFriends.SetPlayedWith(player);
+                    return peer;
+                }
+            }
+
+            return null;
         }
 
         public async static void UpdatePeerList()
@@ -79,83 +104,82 @@ namespace SteamP2PInfo
                 }
             }
 
+            int processed = 0;
             while (!mustReopenLog)
             {
                 string line = await sr.ReadLineAsync();
                 if (line == null) break;
 
-                if (!line.Contains(GameConfig.Current.ProcessName) || line.Contains("IClientMatchmaking::LeaveLobby"))
+                // this should happen about once a second, so we can be generous and say a 100tick game sending 5 packets per tick over 2 seconds would create about 1000 log lines
+                if (processed > 1000)
+                {
+                    Logger.WriteLine($"[PARSE LAG] Maximum lines parsed this tick, will try and catch up next tick.");
+                    continue;
+                }
+
+                if (!line.Contains("SendP2PPacket") || !line.Contains(GameConfig.Current.ProcessName))
                     continue;
 
-                CSteamID lobby = ExtractLobby(line);
+                CSteamID steamID = ExtractUser(line);
 
-                if (lobby.IsLobby() && !mLobbies.Contains(lobby))
-                    mLobbies.Add(lobby);
-            }
-
-            mLobbies.RemoveWhere(lobbyID =>
-            {
-                int numMembers = SteamMatchmaking.GetNumLobbyMembers(lobbyID);
-                if (numMembers == 0) return true;
-
-                bool localPlayerInLobby = false;
-                for (int i = 0; i < numMembers; i++)
+                if (steamID.m_SteamID != 0)
                 {
-                    CSteamID player = SteamMatchmaking.GetLobbyMemberByIndex(lobbyID, i);
-
-                    if (player == (CSteamID)0 || mPeers.ContainsKey(player)) continue;
-                    if (player == SteamUser.GetSteamID())
+                    if (steamID.BIndividualAccount())
                     {
-                        localPlayerInLobby = true;
-                        continue;
-                    }
-                    if (SteamNetworking.GetP2PSessionState(player, out P2PSessionState_t pConnectionState) && SteamPeerOldAPI.IsSessionStateOK(pConnectionState))
-                    {
-                        mPeers[player] = new SteamPeerOldAPI(player);
-                        Logger.WriteLine($"[PEER CONNECT] \"{mPeers[player].Name}\" (https://steamcommunity.com/profiles/{(ulong)mPeers[player].SteamID}) has connected via SteamNetworking");
-                        if (GameConfig.Current.SetPlayedWith)
-                            SteamFriends.SetPlayedWith(player);
+                        if (mPeers.TryGetValue(steamID, out SteamPeerInfo peer))
+                        {
+                            peer.OnPacketSent();
+                        }
+                        else
+                        {
+                            SteamPeerBase newPeer = GetPeer(steamID);
+                            if (newPeer != null)
+                            {
+                                mPeers.Add(steamID, new SteamPeerInfo(newPeer));
+                            }
+                        }
                     }
                     else
                     {
-                        SteamNetworkingIdentity netIdentity = new SteamNetworkingIdentity();
-                        netIdentity.SetSteamID(player);
-                        var connState = SteamNetworkingMessages.GetSessionConnectionInfo(ref netIdentity, out _, out _);
-                        if (SteamPeerNewAPI.IsConnStateOK(connState))
-                        {
-                            mPeers[player] = new SteamPeerNewAPI(player);
-                            Logger.WriteLine($"[PEER CONNECT] \"{mPeers[player].Name}\" (https://steamcommunity.com/profiles/{(ulong)mPeers[player].SteamID}) has connected via SteamNetworkingMessages");
-                            if (GameConfig.Current.SetPlayedWith)
-                                SteamFriends.SetPlayedWith(player);
-                        }
+                        Logger.WriteLine($"[PARSE ERROR] \"{steamID}\" was not a valid steam user");
                     }
                 }
-                return !localPlayerInLobby;
-            });
 
-            foreach (var player in mPeers.Keys.ToArray())
+                processed += 1;
+            }
+
+            // clean up old peers. We can't remove from a Dictionary while iterating, so we save the entries we need to delete and then do a second pass.
+            foreach (var peerMapping in mPeers)
             {
-                bool hasLobbyInCommon = false;
-                foreach (var lobby in mLobbies)
+                if (peerMapping.Value.LastSentPacketElapsedMilliseconds() > peerTimeoutMs)
                 {
-                    if (SteamFriends.IsUserInSource(player, lobby))
-                    {
-                        hasLobbyInCommon = true;
-                        break;
-                    }
+                    inactivePeers.Add(peerMapping);
                 }
-                if (!hasLobbyInCommon || !mPeers[player].UpdatePeerInfo())
+                else if (!peerMapping.Value.steamPeerBase.UpdatePeerInfo())
                 {
-                    Logger.WriteLine($"[PEER DISCONNECT] \"{mPeers[player].Name}\" (https://steamcommunity.com/profiles/{(ulong)mPeers[player].SteamID}) has left the lobby or lost P2P connection");
-                    mPeers[player].Dispose();
-                    mPeers.Remove(player);
+                    peerMapping.Value.disconnect = true;
+                    inactivePeers.Add(peerMapping);
                 }
             }
+            foreach (var peer in inactivePeers)
+            {
+                if (peer.Value.disconnect)
+                {
+                    Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) has disconnected");
+                }
+                else
+                { 
+                    Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) has timed out");
+                }
+                peer.Value.steamPeerBase.Dispose();
+                mPeers.Remove(peer.Key);
+            }
+            inactivePeers.Clear();
         }
 
         public static IEnumerable<SteamPeerBase> GetPeers()
         {
-            return mPeers.Values;
+            return mPeers.Select(entry => entry.Value.steamPeerBase);
         }
     }
 }

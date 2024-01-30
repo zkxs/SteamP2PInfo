@@ -85,58 +85,65 @@ namespace SteamP2PInfo
         {
             this.Invoke(() =>
             {
-                // Necessary to close the program after the game exits, as SteamAPI_Shutdown isn't
-                // sufficient to have steam recognize the game is no longer running
-                if (!WinAPI.User32.IsWindow(wInfo.Handle))
-                    Close();
-
-                if (HotkeyManager.Enabled && !GameConfig.Current.HotkeysEnabled)
-                    HotkeyManager.Disable();
-
-                if (!HotkeyManager.Enabled && GameConfig.Current.HotkeysEnabled)
-                    HotkeyManager.Enable();
-
-                if ((timerTicks = (timerTicks + 1) % 6) == 0)
+                try
                 {
-                    // Rather not have the settings update on a loop, but 
-                    // Fody generated OnChange seems to break PropertyChanged 
-                    // for GameConfig. So do this for now.
-                    GameConfig.Current?.Save();
-                    SteamPeerManager.UpdatePeerList();
-                }
+                    // Necessary to close the program after the game exits, as SteamAPI_Shutdown isn't
+                    // sufficient to have steam recognize the game is no longer running
+                    if (!WinAPI.User32.IsWindow(wInfo.Handle))
+                        Close();
 
-                peers.Clear();
-                foreach (SteamPeerBase p in SteamPeerManager.GetPeers())
-                    peers.Add(p);
+                    if (HotkeyManager.Enabled && !GameConfig.Current.HotkeysEnabled)
+                        HotkeyManager.Disable();
 
-                if (GameConfig.Current.PlaySoundOnNewSession)
-                {
-                    if (peers.Count > 0 && previousPeersAmount == 0)
+                    if (!HotkeyManager.Enabled && GameConfig.Current.HotkeysEnabled)
+                        HotkeyManager.Enable();
+
+                    if ((timerTicks = (timerTicks + 1) % 6) == 0)
                     {
-                        SystemSounds.Beep.Play();
+                        // Rather not have the settings update on a loop, but 
+                        // Fody generated OnChange seems to break PropertyChanged 
+                        // for GameConfig. So do this for now.
+                        GameConfig.Current?.Save();
+                        SteamPeerManager.UpdatePeerList();
                     }
-                    previousPeersAmount = peers.Count;
-                }
 
-                // Update session info column sizes
-                foreach (var col in dataGridSession.Columns)
+                    peers.Clear();
+                    foreach (SteamPeerBase p in SteamPeerManager.GetPeers())
+                        peers.Add(p);
+
+                    if (GameConfig.Current.PlaySoundOnNewSession)
+                    {
+                        if (peers.Count > 0 && previousPeersAmount == 0)
+                        {
+                            SystemSounds.Beep.Play();
+                        }
+                        previousPeersAmount = peers.Count;
+                    }
+
+                    // Update session info column sizes
+                    foreach (var col in dataGridSession.Columns)
+                    {
+                        col.Width = new DataGridLength(1, DataGridLengthUnitType.Pixel);
+                        col.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
+                    }
+                    dataGridSession.UpdateLayout();
+
+                    // Update overlay column sizes
+                    foreach (var col in overlay.dataGrid.Columns)
+                    {
+                        col.Width = new DataGridLength(1, DataGridLengthUnitType.Pixel);
+                        col.Width = new DataGridLength(1, DataGridLengthUnitType.SizeToCells);
+                    }
+                    overlay.dataGrid.UpdateLayout();
+
+                    // Queue position update after the overlay has re-rendered
+                    Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(overlay.UpdatePosition));
+                    overlay.UpdateVisibility();
+                }
+                catch (Exception e)
                 {
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Pixel);
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
+                    Logger.WriteLine($"Error in timer invoke: {e}");
                 }
-                dataGridSession.UpdateLayout();
-
-                // Update overlay column sizes
-                foreach (var col in overlay.dataGrid.Columns)
-                {
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.Pixel);
-                    col.Width = new DataGridLength(1, DataGridLengthUnitType.SizeToCells);
-                }
-                overlay.dataGrid.UpdateLayout();
-
-                // Queue position update after the overlay has re-rendered
-                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(overlay.UpdatePosition));
-                overlay.UpdateVisibility();
             });
         }
 
@@ -238,8 +245,10 @@ namespace SteamP2PInfo
                     Grid configEditor = ConfigUIBuilder.CreateConfigEditor(GameConfig.Current);
                     ConfigTab.Children.Add(configEditor);
 
+                    Logger.WriteLine("Started the thing...");
+
                     ETWPingMonitor.Start();
-                    timer.Change(0, 1000);
+                    timer.Change(0, 1000); // should be a 1s interval
                 }
             }
         }
