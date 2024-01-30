@@ -133,7 +133,7 @@ namespace SteamP2PInfo
             }
             double averageConnectionQuality = totalConnectionQuality / connectionQualities.Count;
 
-            return $"PING min={minPing} avg={averagePing} max={maxPing}; QUALITY min={minConnectionQuality} avg={averageConnectionQuality} max={maxConnectionQuality}";
+            return $"PING min={minPing:.0} avg={averagePing:.0} max={maxPing:.0}; QUALITY min={minConnectionQuality:.0} avg={averageConnectionQuality:.0} max={maxConnectionQuality:.0}";
         }
 
         public virtual void Dispose() { }

@@ -5,7 +5,7 @@ namespace SteamP2PInfo
     internal class SteamPeerInfo
     {
         internal SteamPeerBase steamPeerBase;
-        internal Stopwatch timeSinceLastSessionStarted;
+        private Stopwatch timeSinceLastSessionStarted;
         internal DisconnectReason disconnectReason;
 
         internal SteamPeerInfo(SteamPeerBase steamPeerBase)
@@ -30,7 +30,6 @@ namespace SteamP2PInfo
             NONE,
             AUTH_SESSION_ENDED,
             PEER_DISCONNECTED,
-            TIMED_OUT,
         }
     }
 }
