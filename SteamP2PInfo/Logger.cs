@@ -42,6 +42,11 @@ namespace SteamP2PInfo
             if (fs != null) fs.Write($"[{DateTime.Now:HH:mm:ss.ff}] {message}");
         }
 
+        public static bool Enabled()
+        {
+            return Config.GameConfig.Current != null && Config.GameConfig.Current.LogActivity;
+        }
+
         public static void WriteLine(string message)
         {
             if (Config.GameConfig.Current == null || !Config.GameConfig.Current.LogActivity) return;

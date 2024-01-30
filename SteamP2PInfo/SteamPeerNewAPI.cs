@@ -41,6 +41,7 @@ namespace SteamP2PInfo
             networkingIdentity.SetSteamID(SteamID);
 
             var connState = SteamNetworkingMessages.GetSessionConnectionInfo(ref networkingIdentity, out mConnInfo, out mRealTimeStatus);
+            RecordPeerInfo(Ping, ConnectionQuality);
             return IsConnStateOK(connState);
         }
 

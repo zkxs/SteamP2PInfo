@@ -58,6 +58,7 @@ namespace SteamP2PInfo
                 mNetIdentity = (ulong)mSessionState.m_nRemotePort << 32 | BitConverter.ToUInt32(ipBytes, 0);
                 ETWPingMonitor.Register(mNetIdentity);
             }
+            RecordPeerInfo(Ping, ConnectionQuality);
             return true;
         }
 

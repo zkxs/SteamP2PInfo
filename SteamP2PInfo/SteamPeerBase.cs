@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Steamworks;
 
 using SteamP2PInfo.Config;
@@ -47,6 +44,9 @@ namespace SteamP2PInfo
         /// </summary>
         public abstract double ConnectionQuality { get; }
 
+        private List<double> pings = new List<double>();
+        private List<double> connectionQualities = new List<double>();
+
         /// <summary>
         /// ARGB hexadecimal color code used to fill the ping text.
         /// </summary>
@@ -81,6 +81,60 @@ namespace SteamP2PInfo
         /// Should return true if the peer is still connected and false otherwise.
         /// </summary>
         public abstract bool UpdatePeerInfo();
+
+        protected void RecordPeerInfo(double ping, double connectionQuality)
+        {
+            if (ping >= 0)
+                pings.Add(ping);
+            if (connectionQuality >= 0)
+                connectionQualities.Add(connectionQuality);
+        }
+
+        public string GetConnectionSummary()
+        {
+            if (pings.Count == 0 && connectionQualities.Count == 0)
+            {
+                return "No ping/connection data available.";
+            }
+
+            // ping
+            double minPing = double.PositiveInfinity;
+            double maxPing = 0;
+            double totalPing = 0;
+            foreach (double ping in pings)
+            {
+                if (ping < minPing)
+                {
+                    minPing = ping;
+                }
+                if (ping > maxPing)
+                {
+                    maxPing = ping;
+                }
+                totalPing += ping;
+            }
+            double averagePing = totalPing / pings.Count;
+
+            // connection quality
+            double minConnectionQuality = double.PositiveInfinity;
+            double maxConnectionQuality = 0;
+            double totalConnectionQuality = 0;
+            foreach (double connectionQuality in connectionQualities)
+            {
+                if (connectionQuality < minConnectionQuality)
+                {
+                    minConnectionQuality = connectionQuality;
+                }
+                if (connectionQuality > maxConnectionQuality)
+                {
+                    maxConnectionQuality = connectionQuality;
+                }
+                totalConnectionQuality += connectionQuality;
+            }
+            double averageConnectionQuality = totalConnectionQuality / connectionQualities.Count;
+
+            return $"PING min={minPing} avg={averagePing} max={maxPing}; QUALITY min={minConnectionQuality} avg={averageConnectionQuality} max={maxConnectionQuality}";
+        }
 
         public virtual void Dispose() { }
     }

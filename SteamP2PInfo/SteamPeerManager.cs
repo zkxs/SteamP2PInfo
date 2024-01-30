@@ -205,20 +205,26 @@ namespace SteamP2PInfo
             }
             foreach (var peer in inactivePeers)
             {
-                switch (peer.Value.disconnectReason)
+                if (Logger.Enabled())
                 {
-                    case SteamPeerInfo.DisconnectReason.AUTH_SESSION_ENDED:
-                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) auth session ended");
-                        break;
-                    case SteamPeerInfo.DisconnectReason.PEER_DISCONNECTED:
-                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) peer disconnected");
-                        break;
-                    case SteamPeerInfo.DisconnectReason.TIMED_OUT:
-                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) timed out");
-                        break;
-                    default:
-                        Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) unknown reason");
-                        break;
+                    string summary = peer.Value.steamPeerBase.GetConnectionSummary();
+
+                    switch (peer.Value.disconnectReason)
+                    {
+                        case SteamPeerInfo.DisconnectReason.AUTH_SESSION_ENDED:
+                            Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) game session ended. {summary}");
+                            break;
+                        case SteamPeerInfo.DisconnectReason.PEER_DISCONNECTED:
+                            Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) peer disconnected from monitoring connection. {summary}");
+                            break;
+                        case SteamPeerInfo.DisconnectReason.TIMED_OUT:
+                            Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) timed out. {summary}");
+                            break;
+                        default:
+                            Logger.WriteLine($"[PEER DISCONNECT] \"{peer.Value.steamPeerBase.Name}\" (https://steamcommunity.com/profiles/{(ulong)peer.Value.steamPeerBase.SteamID}) unknown reason. {summary}");
+                            break;
+                    }
+                    
                 }
                 peer.Value.steamPeerBase.Dispose();
                 mPeers.Remove(peer.Key);
