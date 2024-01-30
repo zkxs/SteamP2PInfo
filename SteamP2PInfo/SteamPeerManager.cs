@@ -95,8 +95,12 @@ namespace SteamP2PInfo
                     // If the file must be reopened, read from the last 256 bytes instead of from the end.
                     // This should prevent a rare case of lobby "missing" when the reopen occurs as the IPC calls
                     // are made my the game
-                    if (fs.Length > 256) fs.Seek(-256, SeekOrigin.End);
+                    if (fs.Length > 256)
+                    {
+                        fs.Seek(-256, SeekOrigin.End);
+                    }
                     mustReopenLog = false;
+                    Logger.WriteLine($"[PARSE INFO] Reopened log file");
                 }
                 catch (DirectoryNotFoundException)
                 {
@@ -153,6 +157,10 @@ namespace SteamP2PInfo
                                 {
                                     mPeers.Add(steamID, new SteamPeerInfo(newPeer));
                                 }
+                                else
+                                {
+                                    Logger.WriteLine($"[CONNECT ERROR] could not establish connection to \"{steamID}\"");
+                                }
                             }
                         }
                         else
@@ -171,9 +179,15 @@ namespace SteamP2PInfo
                         Logger.WriteLine($"[PARSE ERROR] \"{steamID}\" was not a valid steam user");
                     }
                 }
+                else
+                {
+                    Logger.WriteLine($"[PARSE ERROR] could not extract SteamID from \"{line}\"");
+                }
 
                 processed += 1;
             }
+
+            Logger.WriteLine($"[PARSE INFO] read {processed} log lines");
 
             // clean up old peers. We can't remove from a Dictionary while iterating, so we save the entries we need to delete and then do a second pass.
             foreach (var peerMapping in mPeers)
