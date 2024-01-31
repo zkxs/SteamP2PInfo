@@ -1,24 +1,26 @@
-# SteamP2PInfo
-Simple C# application displaying active Steam P2P connection info, namely SteamID / ping / connection quality. This was specifically made with Elden Ring in mind, but it should work for any game that groups peers in the same session using SteamMatchmaking lobbies. Also comes with a customizable overlay (**windowed / borderless mode only!**) and logging.
+# SteamP2PInfo - zkxs Edition
+
+This is a fork of [tremwil's original SteamP2PInfo](https://github.com/tremwil/SteamP2PInfo)
+
+Simple C# application displaying active Steam P2P connection info, namely SteamID / ping / connection quality. This was specifically made with Armored Core 6 in mind, but it should work for any game that groups peers in the same session using SteamMatchmaking lobbies.
 
 **It also supports adding peers to the Steam recent players list, if the game does not support this.**
-## [Releases](https://github.com/tremwil/SteamP2PInfo/releases/)
+## [Releases](https://github.com/zkxs/SteamP2PInfo/releases/)
 
-![](https://raw.githubusercontent.com/tremwil/SteamP2PInfo/master/overlay_er.PNG)
-![](https://raw.githubusercontent.com/tremwil/SteamP2PInfo/master/gui.PNG)
+![](gui.PNG)
 
 # How to Use
-Download the lastest release from the Releases tab and extract the ZIP file in any folder on your computer. Once the game is running, start `SteamP2PInfo.exe` and click on "Attach Game". Select the appropriate game window in the dialog. If this game has never been opened before, you will be prompted to enter the game's **Steam AppId**. This can be queried on websites like [steamdb](https://steamdb.info/). The Steam console will then open. **You must enter the following command in the console for the tool to work:** `log_ipc IClientMatchmaking`. The program should now be ready! You can then go in the "Config" tab to customize game-specific settings. 
+Download the lastest release from the Releases tab and extract the ZIP file in any folder on your computer. Once the game is running, start `SteamP2PInfo.exe` and click on "Attach Game". Select the appropriate game window in the dialog. If this game has never been opened before, you will be prompted to enter the game's **Steam AppId**. This can be queried on websites like [steamdb](https://steamdb.info/). The Steam console will then open. **You must enter the following command in the console for the tool to work:** `log_ipc "BeginAuthSession,EndAuthSession"`. The program should now be ready! You can then go in the "Config" tab to customize game-specific settings. 
 
-# Known Issues (V1.0.1)
-### Peers not getting detected in rare circumstances
-This is due to the very naive Steam IPC log file parsing. The program can "miss" a Steam lobby, preventing the detection of P2P peers in this lobby. I plan to improve the log file parsing to make this rarer or completely eliminate it in the future.
+# Differences from Original SteamP2PInfo
 
-### Overlay cannot be dragged around
-I'm not sure what the cause for this is yet. Please modify the "X Offset" and "Y Offset" settings directly for now.
+- Updated to build in Visual Studio 2022 (credit to [@AronDavis](https://github.com/AronDavis) for [fixing one of the build issues](https://github.com/tremwil/SteamP2PInfo/pull/34))
+- Various fixes to work consistently in Armored Core 6
+- Rewrote to use a different `log_ipc` filter. The original SteamP2P info would fail for some games if you were the lobby creator, which in 1v1 AC6 matches is 50% of the time.
+- Removed the overlay feature. Even with the feature disabled via config, the SteamP2PInfo overlay was somehow causing application instability and crashing for me when I'd open the Steam in-game overlay. I recommend putting the SteamP2PInfo on your second monitor. If you lack a second monitor, I apologize for impacting your experience. (Note that for backwards compatibility I've left the overlay configuration intact in the JSON file, but it's unused.)
+- Added additional entries to SteamP2PInfo's log file, including some simple statistics of the overall connection performance when a peer disconnects. If you're interested in being able to look back at a record of your games to see what the connection was like, consider turning on the logging config option.
 
-### Cannot customize ping color thresholds
-Not really an issue, but I plan to implement a GUI editor for this in the future. For now the colors can be changed by directly editing the game's json configuration file. 
+I have only tested this on Armored Core 6: while it's likely it will work on other games as well, it depends heavily on exactly how the game uses the Steamworks API.
 
 # FAQ
 ### Why does it require administrator privileges?

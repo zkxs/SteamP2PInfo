@@ -50,7 +50,7 @@ namespace SteamP2PInfo
 
             peers = new ObservableCollection<SteamPeerBase>();
             dataGridSession.DataContext = peers;
-            Title = "Steam P2P Info " + VersionCheck.CurrentVersion;
+            Title = $"Steam P2P Info {VersionCheck.CurrentVersion} - zkxs edition";
 
             timer = new Timer(Timer_Tick, null, Timeout.Infinite, Timeout.Infinite);
             Settings.Default.PropertyChanged += (s, e) => Settings.Default.Save();
@@ -64,7 +64,7 @@ namespace SteamP2PInfo
                     {
                         this.Invoke(() =>
                         {
-                            linkUpdate.NavigateUri = new Uri("https://github.com/tremwil/SteamP2PInfo/releases/tag/" + v);
+                            linkUpdate.NavigateUri = new Uri("https://github.com/zkxs/SteamP2PInfo/releases/tag/" + v);
                             textUpdate.Text = string.Format("NEW VERSION ({0}), DOWNLOAD HERE", v);
                             this.ShowMessageAsync("New Version Available", string.Format("{0} is out! Click the link in the title bar to download it.", v));
                         });
@@ -284,17 +284,17 @@ namespace SteamP2PInfo
                 NegativeButtonText = "Close"
             };
 
-            var result = this.ShowModalMessageExternal("Necessary Step", "The Steam console has just been opened. Please enter the following to enable matchmaking call logging: \"log_ipc IClientMatchmaking\"",
+            var result = this.ShowModalMessageExternal("Necessary Step", "The Steam console has just been opened. Please enter the following to enable matchmaking call logging: `log_ipc \"BeginAuthSession,EndAuthSession\"`",
                 MessageDialogStyle.AffirmativeAndNegative, diagSettings);
             if (result == MessageDialogResult.Affirmative)
             {
                 try
                 {
-                    Clipboard.SetText("log_ipc IClientMatchmaking");
+                    Clipboard.SetText("log_ipc \"BeginAuthSession,EndAuthSession\"");
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show($"Failed to write command to clipboard. Please enter \"log_ipc IClientMatchmaking\" manually.\n\n {e}", "Write to Clipboard Failed!", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"Failed to write command to clipboard. Please enter `log_ipc \"BeginAuthSession,EndAuthSession\"` manually.\n\n {e}", "Write to Clipboard Failed!", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
