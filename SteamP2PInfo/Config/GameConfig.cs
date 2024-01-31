@@ -87,7 +87,6 @@ namespace SteamP2PInfo.Config
         /// Overlay configuration for this game. Includes things like placement, enabled/disabled, etc.
         /// </summary>
         [JsonProperty("overlay")]
-        [ConfigCategory("Overlay Config")]
         public OverlayConfig OverlayConfig { get; private set; } = new OverlayConfig();
 
         /// <summary>
